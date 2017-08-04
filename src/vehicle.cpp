@@ -22,6 +22,19 @@ Vehicle::Vehicle(int lane, int s, int v, int a) {
 
 Vehicle::~Vehicle() {}
 
+void print_pred(map<int,vector < vector<int> > > predictions) {
+  for (auto const& el: predictions) {
+    cout << "Car " << el.first << ": ";
+    for (auto const& vec: el.second) {
+    for (auto const& s: vec) {
+      cout << s << ",";
+    }
+    cout << " - ";
+    }
+    cout << endl;
+  }
+}
+
 // TODO - Implement this method.
 void Vehicle::update_state(map<int,vector < vector<int> > > predictions) {
 	/*
@@ -57,9 +70,42 @@ void Vehicle::update_state(map<int,vector < vector<int> > > predictions) {
     }
 
     */
-    state = "KL"; // this is an example of how you change state.
+
+  //print_pred(predictions);
+
+  int current_lane = predictions[-1][0][0], target_lane = 0;
+  vector<string> possible_actions;
+  if (state == "KL") {
+    possible_actions = { "KL", "PLCL", "PLCR" };
+  }
+  if (state == "PLCL") {
+    possible_actions = {  "LCL" };
+  }
+  if (state == "PLCR") {
+    possible_actions = {  "LCR" };
+  }
+  if (state == "LCL") {
+    possible_actions = { "PLCL", "KL" };
+  }
+  if (state == "LCR") {
+    possible_actions = { "PLCR", "KL" };
+  }
+
+  map<string, int> lane_cost_action = {
+      {"KL", current_lane != target_lane},
+      {"PLCL", current_lane >= target_lane},
+      {"PLCR", current_lane <= target_lane},
+      {"LCL", current_lane >= target_lane},
+      {"LCR", current_lane <= target_lane}};
 
 
+  string min_state = *min_element(possible_actions.begin(), possible_actions.end(),
+     [lane_cost_action] (const string a, const string b) { return lane_cost_action.at(a) < lane_cost_action.at(b); });
+
+  state = min_state;
+  cout << (current_lane != target_lane) <<","<<(current_lane >= target_lane) <<","<< (current_lane <= target_lane) << endl;
+  cout << predictions[-1][0][1] << ", " << predictions[-1][1][1]<< " -- " << predictions[1][0][1] << ", " << predictions[2][0][1] << endl;
+  cout << min_state << "," << v << ", " << target_speed << endl;
 }
 
 void Vehicle::configure(vector<int> road_data) {

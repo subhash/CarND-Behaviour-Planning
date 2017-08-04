@@ -48,7 +48,7 @@ int main() {
 	
 	while (road.get_ego().s <= GOAL[0]) {
 		timestep++;
-		if (timestep > 35) {
+		if (timestep > 7) {
 			break;
 		}
 		road.advance();
