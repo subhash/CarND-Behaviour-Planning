@@ -5,6 +5,7 @@
 #include <map>
 #include <string>
 #include <iterator>
+#include <algorithm>
 
 /**
  * Initializes Vehicle
@@ -33,6 +34,54 @@ void print_pred(map<int,vector < vector<int> > > predictions) {
     }
     cout << endl;
   }
+}
+
+float cost_for_action(map<int,vector < vector<int> > > predictions, string action, int current_lane, int target_lane, int available_lanes, int target_speed){
+  map<int, float> front_gaps;
+  for (int l=0; l<available_lanes; l++) {
+    front_gaps[l] = numeric_limits<float>::max();
+  }
+  int s = predictions[-1][0][1];
+  for (auto const& entry: predictions) {
+    auto vehicle_id = entry.first;
+    int vl = entry.second[0][0], vs = entry.second[0][1];
+    int gap = vs - s;
+    if (vehicle_id != -1 && gap > 0 && front_gaps[vl] > gap) {
+      front_gaps[vl] = gap;
+    }
+  }
+
+  int diff_lane = current_lane - target_lane;
+  if (action == "KL") {
+    float diff_lane_cost = abs(diff_lane);
+    float front_gap_cost = target_speed / front_gaps[current_lane];
+    return diff_lane_cost + 1.5*front_gap_cost;
+  }
+  if (action == "PLCL") {
+    if (diff_lane+1 > available_lanes) return numeric_limits<float>::max();
+    float diff_lane_cost = abs(diff_lane+1);
+    float front_gap_cost = target_speed / front_gaps[current_lane + 1];
+    return diff_lane_cost + 1.5*front_gap_cost;
+  }
+  if (action == "PLCR") {
+    if (diff_lane-1 < 0) return numeric_limits<float>::max();
+    float diff_lane_cost = abs(diff_lane-1);
+    float front_gap_cost = target_speed / front_gaps[current_lane - 1];
+    return diff_lane_cost + 1.5*front_gap_cost;
+  }
+  if (action == "LCL") {
+    if (diff_lane+1 > available_lanes) return numeric_limits<float>::max();
+    float diff_lane_cost = abs(diff_lane+1);
+    float front_gap_cost = target_speed / front_gaps[current_lane + 1];
+    return diff_lane_cost + 1.5*front_gap_cost;
+  }
+  if (action == "LCR") {
+    if (diff_lane-1 < 0) return numeric_limits<float>::max();
+    float diff_lane_cost = abs(diff_lane-1);
+    float front_gap_cost = target_speed / front_gaps[current_lane - 1];
+    return diff_lane_cost + 1.5*front_gap_cost;
+  }
+  return numeric_limits<float>::max();
 }
 
 // TODO - Implement this method.
@@ -71,18 +120,16 @@ void Vehicle::update_state(map<int,vector < vector<int> > > predictions) {
 
     */
 
-  //print_pred(predictions);
-
   int current_lane = predictions[-1][0][0], target_lane = 0;
   vector<string> possible_actions;
   if (state == "KL") {
     possible_actions = { "KL", "PLCL", "PLCR" };
   }
   if (state == "PLCL") {
-    possible_actions = {  "LCL" };
+    possible_actions = {  "LCL", "KL" };
   }
   if (state == "PLCR") {
-    possible_actions = {  "LCR" };
+    possible_actions = {  "LCR", "KL" };
   }
   if (state == "LCL") {
     possible_actions = { "PLCL", "KL" };
@@ -91,21 +138,17 @@ void Vehicle::update_state(map<int,vector < vector<int> > > predictions) {
     possible_actions = { "PLCR", "KL" };
   }
 
-  map<string, int> lane_cost_action = {
-      {"KL", current_lane != target_lane},
-      {"PLCL", current_lane >= target_lane},
-      {"PLCR", current_lane <= target_lane},
-      {"LCL", current_lane >= target_lane},
-      {"LCR", current_lane <= target_lane}};
+  vector<float> costs;
+  for (auto const& a: possible_actions) costs.push_back(
+      cost_for_action(predictions, a, current_lane, target_lane, lanes_available, target_speed));
+  // cout << "Actions : ";
+  // for (auto const& a: possible_actions) cout << a << ", " ;
+  // cout << endl << "Costs: ";
+  // for (auto const& c: costs) cout << c << ", " ;
 
-
-  string min_state = *min_element(possible_actions.begin(), possible_actions.end(),
-     [lane_cost_action] (const string a, const string b) { return lane_cost_action.at(a) < lane_cost_action.at(b); });
-
-  state = min_state;
-  cout << (current_lane != target_lane) <<","<<(current_lane >= target_lane) <<","<< (current_lane <= target_lane) << endl;
-  cout << predictions[-1][0][1] << ", " << predictions[-1][1][1]<< " -- " << predictions[1][0][1] << ", " << predictions[2][0][1] << endl;
-  cout << min_state << "," << v << ", " << target_speed << endl;
+  int min_pos = distance(costs.begin(), min_element(costs.begin(), costs.end()));
+  // cout << "min_pos " << min_pos << endl;
+  state = possible_actions[min_pos];
 }
 
 void Vehicle::configure(vector<int> road_data) {
@@ -345,7 +388,6 @@ void Vehicle::realize_prep_lane_change(map<int,vector<vector<int> > > prediction
     	}
 
     }
-
 }
 
 vector<vector<int> > Vehicle::generate_predictions(int horizon = 10) {
